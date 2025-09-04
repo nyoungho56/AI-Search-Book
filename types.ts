@@ -1,3 +1,15 @@
+export interface Review {
+  id: string;
+  author: string;
+  content: string;
+  password: string;
+}
+
+export interface RecommendedBook {
+  title: string;
+  coverImageUrl: string;
+}
+
 export interface Book {
   id: string;
   title: string;
@@ -7,4 +19,6 @@ export interface Book {
   genre: string;
   summary: string;
   coverImageUrl: string;
+  otherBooksByAuthor?: RecommendedBook[];
+  reviews?: Review[];
 }

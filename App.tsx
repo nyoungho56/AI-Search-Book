@@ -5,7 +5,7 @@ import LoadingSpinner from './components/LoadingSpinner';
 import BookCard from './components/BookCard';
 import BookListItem from './components/BookListItem';
 import { searchBooks } from './services/geminiService';
-import type { Book } from './types';
+import type { Book, Review } from './types';
 
 const App: React.FC = () => {
   const [query, setQuery] = useState<string>('');
@@ -55,6 +55,77 @@ const App: React.FC = () => {
     setSelectedBook(null);
   };
 
+  const handleSelectRecommendedBook = useCallback(async (title: string) => {
+    setIsLoading(true);
+    setError(null);
+    setSelectedBook(null);
+
+    try {
+      const results = await searchBooks(title);
+      if (results.length > 0) {
+        const exactMatch = results.find(book => book.title.toLowerCase() === title.toLowerCase());
+        setSelectedBook(exactMatch || results[0]);
+      } else {
+        setError(`"${title}"에 대한 책 정보를 찾을 수 없습니다.`);
+      }
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('알 수 없는 오류가 발생했습니다.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const handleAddReview = useCallback((bookId: string, reviewData: Omit<Review, 'id'>) => {
+    const newReview = { ...reviewData, id: crypto.randomUUID() };
+    
+    const updater = (prevBooks: Book[]) => prevBooks.map(book => {
+      if (book.id === bookId) {
+        const updatedBook = {
+          ...book,
+          reviews: [...(book.reviews || []), newReview]
+        };
+        if (selectedBook?.id === bookId) {
+          setSelectedBook(updatedBook);
+        }
+        return updatedBook;
+      }
+      return book;
+    });
+
+    setBooks(updater);
+  }, [selectedBook]);
+
+  const handleDeleteReview = useCallback((bookId: string, reviewId: string, passwordAttempt: string): boolean => {
+    const bookToUpdate = books.find(b => b.id === bookId);
+    const reviewToDelete = bookToUpdate?.reviews?.find(r => r.id === reviewId);
+
+    if (!reviewToDelete || reviewToDelete.password !== passwordAttempt) {
+      return false;
+    }
+
+    const updater = (prevBooks: Book[]) => prevBooks.map(book => {
+      if (book.id === bookId) {
+        const updatedBook = {
+          ...book,
+          reviews: book.reviews?.filter(r => r.id !== reviewId)
+        };
+        if (selectedBook?.id === bookId) {
+          setSelectedBook(updatedBook);
+        }
+        return updatedBook;
+      }
+      return book;
+    });
+
+    setBooks(updater);
+    return true;
+  }, [books, selectedBook]);
+
+
   const renderContent = () => {
     if (isLoading) {
       return <LoadingSpinner />;
@@ -63,7 +134,15 @@ const App: React.FC = () => {
       return <p className="text-red-500 text-lg bg-red-100 p-4 rounded-lg animate-fade-in">{error}</p>;
     }
     if (selectedBook) {
-      return <BookCard book={selectedBook} onBack={handleGoBack} />;
+      return (
+        <BookCard 
+          book={selectedBook} 
+          onBack={handleGoBack} 
+          onSelectRecommended={handleSelectRecommendedBook}
+          onAddReview={(reviewData) => handleAddReview(selectedBook.id, reviewData)}
+          onDeleteReview={(reviewId, password) => handleDeleteReview(selectedBook.id, reviewId, password)}
+        />
+      );
     }
     if (!isInitial && books.length > 0) {
       return (

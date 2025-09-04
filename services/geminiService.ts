@@ -7,6 +7,15 @@ if (!process.env.API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+const recommendedBookSchema = {
+    type: Type.OBJECT,
+    properties: {
+        title: { type: Type.STRING, description: "책의 제목" },
+        coverImageUrl: { type: Type.STRING, description: "책 표지를 위한 플레이스홀더 이미지 URL. 'https://picsum.photos/seed/UNIQUE_SEED/400/600' 형식이어야 합니다." },
+    },
+    required: ["title", "coverImageUrl"],
+};
+
 const bookSchema = {
   type: Type.OBJECT,
   properties: {
@@ -17,9 +26,14 @@ const bookSchema = {
     publisher: { type: Type.STRING, description: "책의 출판사" },
     genre: { type: Type.STRING, description: "책의 장르" },
     summary: { type: Type.STRING, description: "200-300자 내외의 상세한 책 줄거리 요약" },
-    coverImageUrl: { type: Type.STRING, description: "책 표지를 위한 플레이스홀더 이미지 URL. 반드시 'https://picsum.photos/400/600' 형식이어야 합니다." },
+    coverImageUrl: { type: Type.STRING, description: "책 표지를 위한 플레이스홀더 이미지 URL. 반드시 'https://picsum.photos/seed/UNIQUE_SEED/400/600' 형식이어야 합니다." },
+    otherBooksByAuthor: {
+        type: Type.ARRAY,
+        description: "같은 저자의 다른 대표작 2-3권 목록. 책이 없으면 빈 배열로 둡니다.",
+        items: recommendedBookSchema,
+    },
   },
-  required: ["id", "title", "author", "publicationYear", "publisher", "genre", "summary", "coverImageUrl"],
+  required: ["id", "title", "author", "publicationYear", "publisher", "genre", "summary", "coverImageUrl", "otherBooksByAuthor"],
 };
 
 const bookListSchema = {
@@ -30,7 +44,7 @@ const bookListSchema = {
 
 export const searchBooks = async (query: string): Promise<Book[]> => {
   try {
-    const prompt = `"${query}"와 관련이 깊은 실존하는 책 5권을 찾아 목록으로 만들어줘. 만약 관련 책을 찾을 수 없다면, "${query}"라는 키워드를 포함하는 가상의 책 5권의 목록을 창의적으로 만들어줘. 응답은 반드시 정의된 JSON 스키마를 따라야 해. 각 책의 coverImageUrl은 'https://picsum.photos/seed/UNIQUE_SEED/400/600' 형식을 따라야 하며, UNIQUE_SEED 부분은 각 책마다 달라야 해.`;
+    const prompt = `"${query}"와 관련이 깊은 실존하는 책 5권을 찾아 목록으로 만들어줘. 만약 관련 책을 찾을 수 없다면, "${query}"라는 키워드를 포함하는 가상의 책 5권의 목록을 창의적으로 만들어줘. 응답은 반드시 정의된 JSON 스키마를 따라야 해. 각 책에 대해, 같은 저자의 다른 대표작 2-3권도 함께 추천해줘. 모든 책의 coverImageUrl은 'https://picsum.photos/seed/UNIQUE_SEED/400/600' 형식을 따라야 하며, UNIQUE_SEED 부분은 각 책마다 고유해야 해.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
